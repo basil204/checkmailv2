@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Kiểm tra mã 2FA</title>
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <style>
+    textarea { resize: vertical; }
+    .token-now { font-weight: bold; color: green; }
+    @media (max-width: 700px) {
+      .container { padding: 10px 2vw !important; max-width: 99vw; }
+      h3 { font-size: 1.1rem; }
+      .btn, textarea, .list-group-item, .card-header { font-size: 1rem; }
+      textarea { min-width: 100%; }
+    }
+    @media (max-width: 500px) {
+      .container { max-width: 99vw; padding: 6px 1vw !important; }
+      h3 { font-size: 1rem; }
+      .btn, textarea, .list-group-item, .card-header { font-size: 0.97rem; }
+      textarea { min-width: 100%; }
+    }
+  </style>
+</head>
+<body>
+<%- include('partials/navbar') %>
+
+<div class="container mt-4">
+  <h3>🔐 Kiểm tra mã 2FA từ nhiều secret</h3>
+
+  <form method="POST" action="/get-tokens" class="mb-4">
+    <label>Nhập một hoặc nhiều mã secret (base32), mỗi dòng một mã:</label>
+    <textarea name="secrets" class="form-control" rows="6" placeholder="VD:\nJBSWY3DPEHPK3PXP\nKRUGS4ZANFZSA3DF" required><%= secrets %></textarea>
+    <button class="btn btn-primary mt-2">📟 Lấy mã</button>
+  </form>
+
+  <% if (error) { %>
+    <div class="alert alert-danger"><%= error %></div>
+  <% } %>
+
+  <% if (timeLeft !== null) { %>
+    <div class="alert alert-info">⏱️ Còn <strong><%= timeLeft %></strong> giây trước khi mã thay đổi.</div>
+  <% } %>
+
+  <% if (results.length) { %>
+    <% results.forEach((item, idx) => { %>
+      <div class="card mb-3">
+        <div class="card-header">
+          Secret <%= idx + 1 %>: <code><%= item.secret %></code>
+        </div>
+        <ul class="list-group list-group-flush">
+          <% item.tokens.forEach(t => { %>
+            <li class="list-group-item">
+              <span class="<%= t.timeOffset === 0 ? 'token-now' : '' %>">Mã: <%= t.token %></span>
+              <% if (t.timeOffset === 0) { %> (hiện tại) <% } %>
+              <% if (t.timeOffset < 0) { %> (trước) <% } %>
+              <% if (t.timeOffset > 0) { %> (sau) <% } %>
+            </li>
+          <% }) %>
+        </ul>
+      </div>
+    <% }) %>
+  <% } %>
+</div>
+</body>
+</html>

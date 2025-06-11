@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>📧 Tạo Email Ảo</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <style>
+    html, body {
+      box-sizing: border-box;
+      overflow-x: hidden;
+    }
+    *, *:before, *:after {
+      box-sizing: inherit;
+    }
+    body {
+      font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
+      background: linear-gradient(135deg, #e0e7ff 0%, #e9d5ff 100%);
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+    .container {
+      max-width: 600px;
+      margin: 24px auto;
+      background: #fff;
+      border-radius: 18px;
+      padding: 24px 10px 20px 10px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.10);
+      overflow-x: hidden;
+    }
+    h2 {
+      text-align: center;
+      color: #2563eb;
+      font-weight: 700;
+      margin-bottom: 18px;
+      letter-spacing: 1px;
+    }
+    form {
+      margin-bottom: 18px;
+    }
+    input, select, button {
+      width: 100%;
+      padding: 13px;
+      margin-top: 13px;
+      border-radius: 10px;
+      border: 1px solid #c7d2fe;
+      font-size: 15px;
+      transition: border 0.2s;
+    }
+    input:focus, select:focus {
+      border: 1.5px solid #2563eb;
+      outline: none;
+    }
+    button {
+      background: linear-gradient(90deg, #2563eb 60%, #10b981 100%);
+      color: white;
+      font-weight: bold;
+      border: none;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(16,185,129,0.08);
+      transition: background 0.2s;
+    }
+    button:hover {
+      background: linear-gradient(90deg, #1d4ed8 60%, #059669 100%);
+    }
+    .result-box, .inbox-box {
+      margin-top: 24px;
+      padding: 18px 12px;
+      background: #f8fafc;
+      border: 1px solid #e0e7ff;
+      border-radius: 14px;
+      box-shadow: 0 2px 8px rgba(59,130,246,0.04);
+    }
+    .message {
+      margin-bottom: 13px;
+      padding: 12px 10px 8px 10px;
+      background: #fff;
+      border-left: 4px solid #2563eb;
+      box-shadow: 0 2px 8px rgba(59,130,246,0.06);
+      border-radius: 8px;
+      position: relative;
+      transition: box-shadow 0.2s, border-color 0.2s;
+    }
+    .message:hover {
+      box-shadow: 0 4px 16px rgba(59,130,246,0.13);
+      border-left: 4px solid #10b981;
+    }
+    .otp-btn {
+      margin-left: 8px;
+      padding: 4px 10px;
+      font-size: 13px;
+      border-radius: 8px;
+      background: linear-gradient(90deg, #2563eb 60%, #10b981 100%);
+      color: white;
+      border: none;
+      cursor: pointer;
+      transition: background 0.2s, box-shadow 0.2s;
+      box-shadow: 0 1px 4px rgba(59,130,246,0.04);
+    }
+    .otp-btn:hover {
+      background: linear-gradient(90deg, #1d4ed8 60%, #059669 100%);
+      box-shadow: 0 2px 8px rgba(16,185,129,0.10);
+    }
+    .email-detail-text {
+      white-space: pre-wrap;
+      margin-top: 2px;
+      background: #f1f5f9;
+      border-radius: 10px;
+      padding: 14px 10px;
+      font-size: 1.02rem;
+      color: #22223b;
+      border: 1px solid #e0e7ef;
+      box-shadow: 0 1px 4px rgba(59,130,246,0.04);
+      min-height: 40px;
+      max-width: 98vw;
+      max-height: 260px;
+      overflow: auto;
+      cursor: grab;
+      word-break: break-word;
+      scrollbar-width: thin;
+      scrollbar-color: #c7d2fe #f1f5f9;
+      transition: box-shadow 0.18s;
+    }
+    .email-detail-text:focus, .email-detail-text:hover {
+      box-shadow: 0 2px 12px rgba(59,130,246,0.10);
+    }
+    .email-detail-text::-webkit-scrollbar {
+      width: 7px;
+      background: #f1f5f9;
+    }
+    .email-detail-text::-webkit-scrollbar-thumb {
+      background: #c7d2fe;
+      border-radius: 6px;
+    }
+    /* Modal styles */
+    .modal-bg {
+      position: fixed; left: 0; top: 0; width: 100vw; height: 100vh;
+      background: rgba(30,41,59,0.25); z-index: 1000; display: flex; align-items: center; justify-content: center;
+      transition: opacity 0.2s;
+    }
+    .modal-content {
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+      padding: 24px 8px 16px 8px;
+      max-width: 99vw;
+      width: 99vw;
+      position: relative;
+      animation: modalIn 0.18s cubic-bezier(.4,1.4,.6,1) both;
+    }
+    @keyframes modalIn { from { transform: translateY(40px) scale(0.98); opacity: 0; } to { transform: none; opacity: 1; } }
+    .modal-close {
+      position: absolute; top: 12px; right: 16px; background: none; border: none; font-size: 1.5rem; color: #64748b; cursor: pointer;
+      transition: color 0.15s;
+    }
+    .modal-close:hover { color: #ef4444; }
+    @media (max-width: 700px) {
+      .container { padding: 10px 2vw; max-width: 99vw; }
+      h2 { font-size: 1.1rem; }
+      .result-box, .inbox-box { padding: 12px 4px; }
+      .message { font-size: 0.98rem; }
+      .modal-content { max-width: 99vw; width: 99vw; padding: 12px 2vw 12px 2vw; }
+      .email-detail-text { max-width: 98vw; font-size: 0.97rem; }
+      input, select, button { font-size: 0.98rem; padding: 11px; }
+    }
+    @media (max-width: 500px) {
+      .container { max-width: 99vw; padding: 6px 1vw; }
+      .modal-content { max-width: 99vw; width: 99vw; padding: 8px 1vw 8px 1vw; }
+      .email-detail-text { max-width: 98vw; font-size: 0.95rem; }
+      .result-box, .inbox-box { padding: 8px 2px; }
+      .message { font-size: 0.95rem; }
+      h2 { font-size: 1rem; }
+      input, select, button { font-size: 0.95rem; padding: 9px; }
+    }
+  </style>
+</head>
+<body>
+    <%- include('partials/navbar') %>
+    <div class="container">
+      <h2>📧 Tạo Email Ảo</h2>
+      <form onsubmit="createEmail(event)">
+        <input type="text" id="username" placeholder="Nhập tên người dùng (trống nếu muốn random)">
+        <select id="domain"></select>
+        <button type="submit">🚀 Tạo Email</button>
+      </form>
+
+      <div class="result-box" id="emailInfo" style="display:none;">
+        📩 <strong>Email:</strong> <span id="createdEmail"></span><br>
+        <button onclick="copyEmail()" style="margin-top:10px;">📋 Sao chép Email</button>
+      </div>
+
+      <div class="inbox-box" id="inboxContainer" style="display:none;">
+        <h3>📨 Hộp thư đến</h3>
+        <div id="inbox">--</div>
+      </div>
+    </div>
+
+    <script>
+      let intervalId = null;
+
+      window.onload = () => loadDomains();
+
+      async function loadDomains() {
+        const select = document.getElementById('domain');
+        select.innerHTML = '';
+
+        try {
+          const res = await fetch('/domains');
+          const data = await res.json();
+          let domains = data.domains || [];
+
+          // Thêm thủ công nếu thiếu
+          ['mejve.site', 'hoalu.edu.pl'].forEach(domain => {
+            if (!domains.includes(domain)) domains.push(domain);
+          });
+
+          domains.forEach(domain => {
+            const opt = document.createElement('option');
+            opt.value = domain;
+            opt.textContent = domain;
+            select.appendChild(opt);
+          });
+
+          select.value = 'mejve.site';
+        } catch {
+          ['mejve.site', 'hoalu.edu.pl'].forEach(domain => {
+            const opt = document.createElement('option');
+            opt.value = domain;
+            opt.textContent = domain;
+            select.appendChild(opt);
+          });
+          select.value = 'mejve.site';
+        }
+      }
+
+      async function createEmail(event) {
+        event.preventDefault();
+        const username = document.getElementById('username').value.trim();
+        const domain = document.getElementById('domain').value;
+        const body = username ? { address: `${username}@${domain}` } : { domain };
+
+        const res = await fetch('/create-or-use-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+
+        const result = await res.json();
+        if (!res.ok) return alert(result.error);
+
+        document.getElementById('createdEmail').innerText = result.email;
+        document.getElementById('emailInfo').style.display = 'block';
+
+        if (result.inboxUrl) {
+          document.getElementById('inboxContainer').style.display = 'block';
+          clearInterval(intervalId);
+          fetchInbox(result.inboxUrl);
+          intervalId = setInterval(() => fetchInbox(result.inboxUrl), 5000);
+        }
+      }
+
+      async function fetchInbox(url) {
+        // Lấy accountId và mailboxId từ URL
+        const urlObj = new URL(url, window.location.origin);
+        const accountId = urlObj.searchParams.get('accountId');
+        const mailboxId = urlObj.searchParams.get('mailboxId');
+        const res = await fetch(url);
+        const data = await res.json();
+        const inbox = document.getElementById('inbox');
+
+        inbox.innerHTML = (data.data?.member || []).map(msg => {
+          const otpMatch = msg.subject.match(/\b\d{4,8}\b/);
+          const otpBtn = otpMatch
+            ? `<button class=\"otp-btn\" onclick=\"copyOTP('${otpMatch[0]}')\">📋 OTP</button>`
+            : '';
+          return `
+            <div class=\"message\" id=\"msg-${msg.id}\">
+              <strong style='color:#2563eb;'>From:</strong> ${msg.from.name || ''} &lt;${msg.from.address}&gt;<br>
+              <strong style='color:#059669;'>Subject:</strong> ${msg.subject} ${otpBtn}<br>
+              <small style='color:#64748b;'>${new Date(msg.date).toLocaleString()}</small><br>
+              <button class=\"otp-btn\" style='margin-top:8px;' onclick=\"showDetailModal('${msg.id}', '${accountId}', '${mailboxId}', '${msg.id}')\">👁️ Xem chi tiết</button>
+            </div>
+          `;
+        }).join('') || '<p style=\"color:#64748b;\">-- Chưa có email nào --</p>';
+      }
+
+      // Modal hiển thị chi tiết thư
+      function showDetailModal(msgId, accountId, mailboxId, messageId) {
+        // Nếu đã có modal thì xóa trước
+        const oldModal = document.getElementById('modal-bg');
+        if (oldModal) oldModal.remove();
+        // Tạo modal
+        const modalBg = document.createElement('div');
+        modalBg.className = 'modal-bg';
+        modalBg.id = 'modal-bg';
+        modalBg.innerHTML = `
+          <div class='modal-content' id='modal-content'>
+            <button class='modal-close' onclick='closeModal()' title='Đóng'>&times;</button>
+            <div id='modal-detail-content' style='min-height:80px;'>Đang tải...</div>
+          </div>
+        `;
+        document.body.appendChild(modalBg);
+        // Đóng khi click nền
+        modalBg.onclick = function(e) { if (e.target === modalBg) closeModal(); };
+        // Lấy chi tiết thư
+        fetch(`/message-detail?accountId=${accountId}&mailboxId=${mailboxId}&messageId=${messageId}`)
+          .then(res => res.json())
+          .then(data => {
+            const div = document.getElementById('modal-detail-content');
+            if (!div) return;
+            if (data.error) {
+              div.innerHTML = `<span style='color:red;'>${data.error}</span>`;
+            } else {
+              // Nếu không có text, thử lấy html hoặc intro
+              let mainContent = data.text;
+              if (!mainContent && Array.isArray(data.html) && data.html.length > 0) {
+                // Lấy html đầu tiên, loại bỏ thẻ script/style và decode html entities
+                let html = data.html[0];
+                html = html.replace(/<script[\s\S]*?<\/script>/gi, '').replace(/<style[\s\S]*?<\/style>/gi, '');
+                // Chuyển html sang text đơn giản
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = html;
+                mainContent = tempDiv.innerText || tempDiv.textContent || '';
+              }
+              if (!mainContent && data.intro) mainContent = data.intro;
+              div.innerHTML = `
+                <div style='font-size:1.13rem; color:#22223b;'>
+                  <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                    <span style="background:#2563eb;color:#fff;padding:6px 12px;border-radius:8px;font-weight:600;font-size:1.05rem;">${data.subject || '(Không tiêu đề)'}</span>
+                  </div>
+                  <div style="margin-bottom:6px;color:#64748b;font-size:0.98rem;">
+                    <b>👤 Từ:</b> <span style="color:#2563eb;">${data.from.name || ''} &lt;${data.from.address}&gt;</span><br>
+                    <b>📥 Đến:</b> <span style="color:#059669;">${(data.to||[]).map(t=>t.address).join(', ')}</span><br>
+                    <b>🕒 Thời gian:</b> <span style="color:#64748b;">${new Date(data.createdAt).toLocaleString()}</span>
+                  </div>
+                  <div style="margin-bottom:6px;color:#64748b;font-size:0.98rem;">
+                    <b>📄 Nội dung:</b>
+                  </div>
+                  <div id='email-detail-text' class="email-detail-text">
+                    ${mainContent ? highlightUrlsAndOtp(mainContent) : '<span style="color:#64748b;">(Không có nội dung)</span>'}
+                  </div>
+                </div>
+              `;
+              setTimeout(() => {
+                document.querySelectorAll('.open-url-btn').forEach(btn => {
+                  btn.onclick = function(e) {
+                    window.open(this.getAttribute('data-url'), '_blank');
+                  };
+                });
+                document.querySelectorAll('.copy-otp-btn').forEach(btn => {
+                  btn.onclick = function(e) {
+                    const otp = this.getAttribute('data-otp');
+                    navigator.clipboard.writeText(otp).then(() => {
+                      alert(`📋 OTP ${otp} đã được sao chép!`);
+                    });
+                  };
+                });
+              }, 50);
+            }
+          })
+          .catch(() => {
+            const div = document.getElementById('modal-detail-content');
+            if (div) div.innerHTML = '<span style="color:red;">Lỗi tải chi tiết thư</span>';
+          });
+      }
+      function closeModal() {
+        const modal = document.getElementById('modal-bg');
+        if (modal) modal.remove();
+      }
+
+      function copyEmail() {
+        const email = document.getElementById('createdEmail').innerText;
+        navigator.clipboard.writeText(email).then(() => {
+          alert('📋 Email đã được sao chép!');
+        });
+      }
+
+      function copyOTP(otp) {
+        navigator.clipboard.writeText(otp).then(() => {
+          alert(`📋 OTP ${otp} đã được sao chép!`);
+        });
+      }
+
+      // Hàm highlight url (ẩn url, chỉ hiện nút) và tạo nút copy OTP
+      function highlightUrlsAndOtp(text) {
+        // Ẩn url, chỉ hiện nút mở liên kết
+        const urlRegex = /(https?:\/\/[^\s]+)/g;
+        let replaced = text.replace(urlRegex, function(url) {
+          return `<button class='otp-btn open-url-btn' data-url='${url}' style='margin:4px 0 4px 0;display:inline-block;'>🔗 Mở liên kết</button>`;
+        });
+        // Tìm OTP (4-8 số liên tiếp) và thêm nút copy
+        const otpRegex = /(\b\d{4,8}\b)/g;
+        replaced = replaced.replace(otpRegex, function(otp) {
+          return `<span style='color:#059669;font-weight:bold;'>${otp}</span> <button class='otp-btn copy-otp-btn' data-otp='${otp}' style='margin-left:6px;'>📋 Copy OTP</button>`;
+        });
+        return replaced;
+      }
+
+      // ===== JS tối ưu bổ sung =====
+      // Đảm bảo chỉ gán sự kiện một lần cho các nút động
+      function delegateEvent(parent, selector, event, handler) {
+        parent.addEventListener(event, function(e) {
+          if (e.target && e.target.matches(selector)) handler.call(e.target, e);
+        });
+      }
+      // Gán sự kiện cho modal khi tạo
+      setTimeout(() => {
+        const modal = document.getElementById('modal-content');
+        if (modal) {
+          delegateEvent(modal, '.open-url-btn', 'click', function() {
+            window.open(this.getAttribute('data-url'), '_blank');
+          });
+          delegateEvent(modal, '.copy-otp-btn', 'click', function() {
+            const otp = this.getAttribute('data-otp');
+            navigator.clipboard.writeText(otp).then(() => {
+              alert(`📋 OTP ${otp} đã được sao chép!`);
+            });
+          });
+        }
+      }, 100);
+    </script>
+</body>
+</html>
