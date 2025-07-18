@@ -8,6 +8,20 @@
     <!-- Add DOMPurify for sanitizing HTML -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.5/purify.min.js"></script>
     <style>
+        /* CSS chống chọn văn bản và kiểm tra */
+        body {
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+        }
+        
+        input, textarea {
+            -webkit-user-select: auto;
+            -moz-user-select: auto;
+            -ms-user-select: auto;
+            user-select: auto;
+        }
         .email-container {
             max-width: 800px;
             margin: 0 auto;
@@ -100,9 +114,21 @@
             <div class="card mb-4">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <h5 class="mb-0">Inbox: <span id="currentEmail"></span></h5>
-                    <button id="refreshButton" class="btn btn-sm btn-outline-primary">
-                        <i class="bi bi-arrow-clockwise"></i> Refresh
-                    </button>
+                    <div class="d-flex align-items-center">
+                        <div class="form-check form-switch me-3">
+                            <input class="form-check-input" type="checkbox" id="autoRefreshToggle" checked>
+                            <label class="form-check-label" for="autoRefreshToggle">Auto Refresh</label>
+                        </div>
+                        <select id="refreshInterval" class="form-select form-select-sm me-2" style="width: auto;">
+                            <option value="5000">5 sec</option>
+                            <option value="10000" selected>10 sec</option>
+                            <option value="30000">30 sec</option>
+                            <option value="60000">1 min</option>
+                        </select>
+                        <button id="refreshButton" class="btn btn-sm btn-outline-primary">
+                            <i class="bi bi-arrow-clockwise"></i> Refresh
+                        </button>
+                    </div>
                 </div>
                 <div class="card-body email-list">
                     <div id="messagesList" class="list-group"></div>
@@ -139,8 +165,96 @@
         </div>
     </div>
 
+    <!-- Thêm thẻ để theo dõi sự thay đổi kích thước cửa sổ (có thể do mở DevTools) -->
+    <div id="devtools-detector" style="position:absolute; width:0; height:0; opacity:0; z-index:-999;"></div>
+    
+    <!-- Add notification sound -->
+    <audio id="notificationSound" preload="auto">
+        <source src="https://assets.mixkit.co/active_storage/sfx/1518/1518-preview.mp3" type="audio/mpeg">
+    </audio>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        // Phát hiện DevTools và tự động tải lại trang
+        (function() {
+            // Các phương pháp phát hiện DevTools
+            function detectDevTools() {
+                // Phương pháp 1: Phát hiện bằng kích thước cửa sổ
+                const widthThreshold = window.outerWidth - window.innerWidth > 160;
+                const heightThreshold = window.outerHeight - window.innerHeight > 160;
+                if (widthThreshold || heightThreshold) {
+                    return true;
+                }
+                
+                // Phương pháp 2: Sử dụng debugger để phát hiện
+                let devtoolsOpen = false;
+                const element = new Image();
+                Object.defineProperty(element, 'id', {
+                    get: function() {
+                        devtoolsOpen = true;
+                        return '';
+                    }
+                });
+                
+                console.log('%c', element);
+                
+                if (devtoolsOpen) {
+                    return true;
+                }
+                
+                // Phương pháp 3: Kiểm tra tính năng debug của Firebug
+                if (window.console && window.console.firebug) {
+                    return true;
+                }
+                
+                return false;
+            }
+            
+            // Kiểm tra mỗi 1 giây
+            let checkInterval = setInterval(function() {
+                if (detectDevTools()) {
+                    // Hiển thị thông báo và tải lại trang
+                    alert('DevTools đã bị phát hiện. Trang web sẽ tải lại.');
+                    window.location.reload();
+                    clearInterval(checkInterval);
+                }
+            }, 1000);
+            
+            // Sự kiện phím tắt phổ biến để mở DevTools
+            window.addEventListener('keydown', function(e) {
+                // F12, Ctrl+Shift+I, Ctrl+Shift+J, Ctrl+Shift+C
+                if (
+                    e.keyCode === 123 || 
+                    (e.ctrlKey && e.shiftKey && (e.keyCode === 73 || e.keyCode === 74 || e.keyCode === 67))
+                ) {
+                    alert('Phím tắt DevTools đã bị vô hiệu hóa.');
+                    e.preventDefault();
+                    return false;
+                }
+            });
+            
+            // Phát hiện khi cửa sổ thay đổi kích thước (có thể do mở DevTools dạng dock)
+            const devtoolsDetector = document.getElementById('devtools-detector');
+            const initialWidth = window.innerWidth;
+            const initialHeight = window.innerHeight;
+            
+            window.addEventListener('resize', function() {
+                // Kiểm tra nếu kích thước cửa sổ thay đổi đáng kể (có thể do mở DevTools)
+                const widthDiff = Math.abs(window.innerWidth - initialWidth);
+                const heightDiff = Math.abs(window.innerHeight - initialHeight);
+                
+                if (widthDiff > 200 || heightDiff > 200) {
+                    alert('Thay đổi kích thước cửa sổ đáng kể được phát hiện. Trang sẽ tải lại.');
+                    window.location.reload();
+                }
+            });
+            
+            // Vô hiệu hóa menu chuột phải
+            document.addEventListener('contextmenu', function(e) {
+                e.preventDefault();
+            });
+        })();
+        
         document.addEventListener('DOMContentLoaded', function() {
             const emailInput = document.getElementById('emailInput');
             const checkButton = document.getElementById('checkButton');
@@ -159,9 +273,13 @@
             const emailTo = document.getElementById('emailTo');
             const emailDate = document.getElementById('emailDate');
             const emailBody = document.getElementById('emailBody');
+            const foundCodesContainer = document.getElementById('foundCodesContainer');
+            const foundCodesList = document.getElementById('foundCodesList');
 
             let currentAccountId = null;
             let currentMailboxId = null;
+            let autoRefreshInterval = null;
+            let lastMessageCount = 0;
             
             checkButton.addEventListener('click', checkEmails);
             refreshButton.addEventListener('click', refreshEmails);
@@ -207,6 +325,9 @@
                     
                     // Display messages
                     displayMessages(data.messages);
+                    
+                    // Start auto-refresh if enabled
+                    startAutoRefresh();
                 })
                 .catch(error => {
                     showLoading(false);
@@ -214,6 +335,37 @@
                     console.error('Error:', error);
                 });
             }
+            
+            // Function to start auto-refresh
+            function startAutoRefresh() {
+                // Clear any existing interval
+                if (autoRefreshInterval) {
+                    clearInterval(autoRefreshInterval);
+                }
+                
+                // Get the selected refresh interval
+                const intervalMs = parseInt(document.getElementById('refreshInterval').value);
+                
+                // Set up the new interval
+                autoRefreshInterval = setInterval(() => {
+                    if (document.getElementById('autoRefreshToggle').checked && 
+                        currentAccountId && currentMailboxId) {
+                        refreshEmails();
+                    }
+                }, intervalMs);
+            }
+            
+            // Listen for changes to the refresh interval
+            document.getElementById('refreshInterval').addEventListener('change', startAutoRefresh);
+            
+            // Listen for changes to the auto-refresh toggle
+            document.getElementById('autoRefreshToggle').addEventListener('change', function() {
+                if (this.checked) {
+                    startAutoRefresh();
+                } else if (autoRefreshInterval) {
+                    clearInterval(autoRefreshInterval);
+                }
+            });
             
             function refreshEmails() {
                 if (!currentAccountId || !currentMailboxId) return;
@@ -238,10 +390,25 @@
                 
                 if (!data || !data.member || data.member.length === 0) {
                     noMessages.style.display = 'block';
+                    lastMessageCount = 0;
                     return;
                 }
                 
                 noMessages.style.display = 'none';
+                
+                // Check if we have new messages
+                const currentMessageCount = data.member.length;
+                const hasNewMessages = currentMessageCount > lastMessageCount;
+                lastMessageCount = currentMessageCount;
+                
+                // If we have new messages and it's not the initial load, play notification sound
+                if (hasNewMessages && currentAccountId && document.getElementById('autoRefreshToggle').checked) {
+                    // Play notification sound if available
+                    const notificationSound = document.getElementById('notificationSound');
+                    if (notificationSound) {
+                        notificationSound.play().catch(err => console.log('Could not play notification sound', err));
+                    }
+                }
                 
                 data.member.forEach(message => {
                     const item = document.createElement('a');
@@ -453,6 +620,51 @@
                 loading.style.display = show ? 'block' : 'none';
             }
         });
+        
+        // Theo dõi trạng thái console để phát hiện DevTools
+        (function() {
+            let consoleOpenTime;
+            let consoleCheckInterval;
+            
+            // Ghi đè console.clear để phát hiện khi nó được gọi
+            const originalClear = console.clear;
+            console.clear = function() {
+                if (consoleOpenTime) {
+                    // DevTools đã được phát hiện, tải lại trang
+                    consoleOpenTime = new Date().getTime();
+                }
+                return originalClear.apply(this, arguments);
+            };
+            
+            function startConsoleCheck() {
+                // Nếu chưa đặt khoảng thời gian kiểm tra, tạo nó
+                if (!consoleCheckInterval) {
+                    consoleOpenTime = new Date().getTime();
+                    
+                    consoleCheckInterval = setInterval(function() {
+                        // Thêm một thông báo debug với CSS để phát hiện nếu console được mở
+                        const detection = new Function('debugger; return false;');
+                        
+                        if (detection()) {
+                            // Nếu debugger đã dừng, điều này có nghĩa là DevTools đã mở
+                            const timeDiff = new Date().getTime() - consoleOpenTime;
+                            
+                            // Nếu đã mở quá 3 giây, tải lại trang
+                            if (timeDiff > 3000) {
+                                clearInterval(consoleCheckInterval);
+                                window.location.reload();
+                            }
+                        } else {
+                            // Reset thời gian nếu DevTools bị đóng
+                            consoleOpenTime = new Date().getTime();
+                        }
+                    }, 1000);
+                }
+            }
+            
+            // Bắt đầu kiểm tra console khi trang đã tải
+            startConsoleCheck();
+        })();
     </script>
 </body>
 </html>
