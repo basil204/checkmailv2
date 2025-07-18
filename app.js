@@ -48,15 +48,34 @@ app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Authentication middleware to restrict access to admin routes
+const adminAuth = (req, res, next) => {
+  const isAdmin = req.query.admin === 'true' && req.query.key === 'admin123';
+  if (isAdmin) {
+    res.locals.isAdmin = true;
+    next();
+  } else {
+    res.status(403).send('Access Denied');
+  }
+};
+
 app.get('/', (req, res) => {
+  const isAdmin = req.query.admin === 'true' && req.query.key === 'admin123';
+  res.render('view-emails', { isAdmin: isAdmin });
+});
+
+// Original index page - now restricted
+app.get('/old-index', adminAuth, (req, res) => {
   res.render('index');
 });
 
-app.get('/TrialGoogle', (req, res) => {
+// Restricted routes
+app.get('/TrialGoogle', adminAuth, (req, res) => {
   res.render('TrialGoogle', { sources });
 });
 
-app.get('/createmail', (req, res) => {
+// Restrict access to createmail page
+app.get('/createmail', adminAuth, (req, res) => {
   res.render('create-email');
 });
 
@@ -173,11 +192,11 @@ app.get('/list-messages', async (req, res) => {
 });
 
 // Lấy mã 2FA từ 1 hoặc nhiều secret và tính thời gian còn lại
-app.get('/get2fa', (req, res) => {
+app.get('/get2fa', adminAuth, (req, res) => {
   res.render('get2fa', { secrets: '', results: [], error: null, timeLeft: null });
 });
 
-app.post('/get-tokens', async (req, res) => {
+app.post('/get-tokens', adminAuth, async (req, res) => {
   const { secrets } = req.body;
   if (!secrets) {
     return res.render('get2fa', { secrets: '', results: [], error: '❌ Thiếu secret', timeLeft: null });
@@ -216,9 +235,85 @@ app.get('/message-detail', async (req, res) => {
       `${SMTP_BASE_URL}/accounts/${accountId}/mailboxes/${mailboxId}/messages/${messageId}`,
       { headers: { 'X-API-KEY': SMTP_API_KEY } }
     );
+    
+    // If there's no HTML content but there are attachments, check if any is HTML
+    if ((!response.data.html || response.data.html.length === 0) && 
+        response.data.attachments && response.data.attachments.length > 0) {
+      
+      // Look for HTML attachments
+      const htmlAttachment = response.data.attachments.find(
+        att => att.contentType && att.contentType.toLowerCase().includes('text/html')
+      );
+      
+      if (htmlAttachment && htmlAttachment.id) {
+        // Fetch the HTML attachment content
+        try {
+          const attachmentResponse = await axios.get(
+            `${SMTP_BASE_URL}/accounts/${accountId}/mailboxes/${mailboxId}/messages/${messageId}/attachments/${htmlAttachment.id}`,
+            { headers: { 'X-API-KEY': SMTP_API_KEY }, responseType: 'text' }
+          );
+          
+          // Add the HTML content from the attachment
+          response.data.html = attachmentResponse.data;
+        } catch (attachmentError) {
+          console.error('Error fetching HTML attachment:', attachmentError);
+        }
+      }
+    }
+    
     res.json(response.data);
   } catch (error) {
-    res.status(error.response?.status || 500).json({ error: 'Không lấy được chi tiết thư' });
+    console.error('Error fetching message detail:', error);
+    res.status(error.response?.status || 500).json({ 
+      error: 'Không lấy được chi tiết thư',
+      details: error.response?.data || error.message
+    });
+  }
+});
+
+app.post('/check-emails', async (req, res) => {
+  const { email } = req.body;
+  if (!email || !email.includes('@')) {
+    return res.status(400).json({ error: 'Địa chỉ email không hợp lệ' });
+  }
+
+  try {
+    // Check if the email account exists
+    const checkResponse = await axios.get(`${SMTP_BASE_URL}/accounts`, {
+      params: { address: email, isActive: true, page: 1 },
+      headers: { 'X-API-KEY': SMTP_API_KEY }
+    });
+
+    const { totalItems, member } = checkResponse.data;
+    
+    if (totalItems === 0) {
+      return res.status(404).json({ error: 'Không tìm thấy email trong hệ thống' });
+    }
+
+    const accountData = member[0];
+    const inboxMailbox = accountData.mailboxes.find(mb => mb.path === 'INBOX');
+    
+    if (!inboxMailbox) {
+      return res.status(404).json({ error: 'Không tìm thấy hộp thư đến' });
+    }
+
+    // Fetch messages for this mailbox
+    const messagesResponse = await axios.get(
+      `${SMTP_BASE_URL}/accounts/${accountData.id}/mailboxes/${inboxMailbox.id}/messages?page=1`,
+      { headers: { 'X-API-KEY': SMTP_API_KEY } }
+    );
+
+    res.json({
+      accountId: accountData.id,
+      mailboxId: inboxMailbox.id,
+      messages: messagesResponse.data
+    });
+  } catch (error) {
+    console.error('Error checking emails:', error);
+    res.status(error.response?.status || 500).json({ 
+      error: 'Lỗi khi kiểm tra email',
+      details: error.response?.data || error.message
+    });
   }
 });
 

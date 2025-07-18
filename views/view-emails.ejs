@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Email Checker</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Add DOMPurify for sanitizing HTML -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.5/purify.min.js"></script>
+    <style>
+        .email-container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .email-list {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        .email-item {
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .email-item:hover {
+            background-color: #f8f9fa;
+        }
+        .email-detail {
+            border-top: 1px solid #dee2e6;
+            padding-top: 20px;
+            margin-top: 20px;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+        .verification-code {
+            background-color: #f8f9fa;
+            padding: 2px 5px;
+            border-radius: 3px;
+            font-weight: bold;
+            border: 1px dashed #ccc;
+        }
+        .copy-btn {
+            margin-left: 5px;
+            padding: 0px 5px;
+            font-size: 0.75rem;
+            vertical-align: middle;
+        }
+        .email-content-wrapper {
+            background-color: white;
+            border-radius: 4px;
+            padding: 15px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .verification-codes-box {
+            margin-top: 15px;
+            padding: 10px;
+            background-color: #f0f8ff;
+            border: 1px solid #d1e7ff;
+            border-radius: 4px;
+            display: none;
+        }
+        .code-pill {
+            display: inline-flex;
+            align-items: center;
+            background: white;
+            padding: 5px 10px;
+            border-radius: 20px;
+            margin: 5px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body>
+    <%- include('partials/navbar') %>
+
+    <div class="container mt-4 email-container">
+        <h2 class="mb-4">Email Checker</h2>
+        
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title">Enter your email address</h5>
+                <p class="text-muted mb-3">Enter the email address you want to check for received messages.</p>
+                <div class="input-group mb-3">
+                    <input type="email" id="emailInput" class="form-control" placeholder="Enter email address">
+                    <button class="btn btn-primary" id="checkButton">Check Emails</button>
+                </div>
+                <div id="emailFeedback" class="text-danger"></div>
+            </div>
+        </div>
+
+        <div id="loading" class="loading">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2">Loading emails...</p>
+        </div>
+
+        <div id="emailResults" style="display: none;">
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Inbox: <span id="currentEmail"></span></h5>
+                    <button id="refreshButton" class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-arrow-clockwise"></i> Refresh
+                    </button>
+                </div>
+                <div class="card-body email-list">
+                    <div id="messagesList" class="list-group"></div>
+                    <div id="noMessages" class="text-center p-4" style="display: none;">
+                        <p class="text-muted">No emails found</p>
+                    </div>
+                </div>
+            </div>
+
+            <div id="emailDetail" class="email-detail" style="display: none;">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 id="emailSubject" class="mb-0"></h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <strong>From:</strong> <span id="emailFrom"></span>
+                        </div>
+                        <div class="mb-3">
+                            <strong>To:</strong> <span id="emailTo"></span>
+                        </div>
+                        <div class="mb-3">
+                            <strong>Date:</strong> <span id="emailDate"></span>
+                        </div>
+                        <hr>
+                        <div id="foundCodesContainer" class="verification-codes-box">
+                            <h6 class="mb-2">Verification Codes Found:</h6>
+                            <div id="foundCodesList"></div>
+                        </div>
+                        <div id="emailBody" class="email-content-wrapper" style="max-width: 100%; overflow: auto;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const emailInput = document.getElementById('emailInput');
+            const checkButton = document.getElementById('checkButton');
+            const emailFeedback = document.getElementById('emailFeedback');
+            const loading = document.getElementById('loading');
+            const emailResults = document.getElementById('emailResults');
+            const currentEmail = document.getElementById('currentEmail');
+            const messagesList = document.getElementById('messagesList');
+            const noMessages = document.getElementById('noMessages');
+            const emailDetail = document.getElementById('emailDetail');
+            const refreshButton = document.getElementById('refreshButton');
+            
+            // Email Subject, From, To, Date and Body elements
+            const emailSubject = document.getElementById('emailSubject');
+            const emailFrom = document.getElementById('emailFrom');
+            const emailTo = document.getElementById('emailTo');
+            const emailDate = document.getElementById('emailDate');
+            const emailBody = document.getElementById('emailBody');
+
+            let currentAccountId = null;
+            let currentMailboxId = null;
+            
+            checkButton.addEventListener('click', checkEmails);
+            refreshButton.addEventListener('click', refreshEmails);
+            
+            function checkEmails() {
+                const email = emailInput.value.trim();
+                if (!email) {
+                    emailFeedback.textContent = 'Please enter an email address';
+                    return;
+                }
+                
+                if (!email.includes('@')) {
+                    emailFeedback.textContent = 'Please enter a valid email address';
+                    return;
+                }
+                
+                emailFeedback.textContent = '';
+                showLoading(true);
+                
+                fetch('/check-emails', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ email }),
+                })
+                .then(response => response.json())
+                .then(data => {
+                    showLoading(false);
+                    
+                    if (data.error) {
+                        emailFeedback.textContent = data.error;
+                        return;
+                    }
+                    
+                    // Show email results
+                    emailResults.style.display = 'block';
+                    currentEmail.textContent = email;
+                    
+                    // Save account and mailbox IDs for future use
+                    currentAccountId = data.accountId;
+                    currentMailboxId = data.mailboxId;
+                    
+                    // Display messages
+                    displayMessages(data.messages);
+                })
+                .catch(error => {
+                    showLoading(false);
+                    emailFeedback.textContent = 'An error occurred. Please try again.';
+                    console.error('Error:', error);
+                });
+            }
+            
+            function refreshEmails() {
+                if (!currentAccountId || !currentMailboxId) return;
+                
+                showLoading(true);
+                emailDetail.style.display = 'none';
+                
+                fetch(`/list-messages?accountId=${currentAccountId}&mailboxId=${currentMailboxId}&page=1`)
+                .then(response => response.json())
+                .then(data => {
+                    showLoading(false);
+                    displayMessages(data.data);
+                })
+                .catch(error => {
+                    showLoading(false);
+                    console.error('Error refreshing emails:', error);
+                });
+            }
+            
+            function displayMessages(data) {
+                messagesList.innerHTML = '';
+                
+                if (!data || !data.member || data.member.length === 0) {
+                    noMessages.style.display = 'block';
+                    return;
+                }
+                
+                noMessages.style.display = 'none';
+                
+                data.member.forEach(message => {
+                    const item = document.createElement('a');
+                    item.className = 'list-group-item list-group-item-action email-item';
+                    item.innerHTML = `
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1">${message.from && message.from.length > 0 ? message.from[0].name || message.from[0].address : 'Unknown Sender'}</h6>
+                            <small>${new Date(message.receivedAt).toLocaleString()}</small>
+                        </div>
+                        <p class="mb-1 text-truncate">${message.subject || '(No Subject)'}</p>
+                    `;
+                    
+                    item.addEventListener('click', () => {
+                        loadMessageDetail(message.id);
+                    });
+                    
+                    messagesList.appendChild(item);
+                });
+            }
+            
+            function loadMessageDetail(messageId) {
+                if (!currentAccountId || !currentMailboxId) return;
+                
+                showLoading(true);
+                
+                fetch(`/message-detail?accountId=${currentAccountId}&mailboxId=${currentMailboxId}&messageId=${messageId}`)
+                .then(response => response.json())
+                .then(data => {
+                    showLoading(false);
+                    
+                    if (data.error) {
+                        console.error('Error loading message:', data.error);
+                        return;
+                    }
+                    
+                    displayMessageDetail(data);
+                })
+                .catch(error => {
+                    showLoading(false);
+                    console.error('Error loading message detail:', error);
+                });
+            }
+            
+            function displayMessageDetail(message) {
+                emailDetail.style.display = 'block';
+                
+                // Set email details
+                emailSubject.textContent = message.subject || '(No Subject)';
+                emailFrom.textContent = message.from && message.from.length > 0 
+                    ? `${message.from[0].name || ''} <${message.from[0].address}>`
+                    : 'Unknown';
+                    
+                emailTo.textContent = message.to && message.to.length > 0 
+                    ? message.to.map(t => `${t.name || ''} <${t.address}>`).join(', ')
+                    : 'Unknown';
+                    
+                emailDate.textContent = new Date(message.receivedAt).toLocaleString();
+                
+                // Set email body - prefer HTML content if available
+                let contentToDisplay = '';
+                
+                if (message.html && message.html.length > 0) {
+                    // Create a safe container for the HTML content
+                    contentToDisplay = DOMPurify ? DOMPurify.sanitize(message.html) : message.html;
+                } else if (message.text) {
+                    contentToDisplay = `<pre>${message.text}</pre>`;
+                } else {
+                    contentToDisplay = '<p>(No content)</p>';
+                }
+                
+                // Process the content to find verification codes
+                emailBody.innerHTML = processVerificationCodes(contentToDisplay);
+                
+                // Add event listeners to copy buttons
+                addCopyButtonListeners();
+                
+                // Scroll to the email detail
+                emailDetail.scrollIntoView({ behavior: 'smooth' });
+            }
+            
+            // Function to process verification codes in email content
+            function processVerificationCodes(content) {
+                // Patterns for common verification code formats
+                const patterns = [
+                    // "Your verification code is: 123456" format
+                    {
+                        regex: /(?:verification|confirmation|security|access|authentication)\s+code(?:\s+is)?(?:\s*:|is)?[^\d]*(\d{4,8})/gi,
+                        template: (match, code) => `${match.replace(code, `<span class="verification-code">${code} <button class="btn btn-sm btn-outline-primary copy-btn" data-code="${code}">Copy</button></span>`)}`
+                    },
+                    // "123456 is your verification code" format
+                    {
+                        regex: /(\d{4,8})(?:\s+is|\s*:)?\s+(?:your|the)?\s+(?:verification|confirmation|security|access|authentication)\s+code/gi,
+                        template: (match, code) => `${match.replace(code, `<span class="verification-code">${code} <button class="btn btn-sm btn-outline-primary copy-btn" data-code="${code}">Copy</button></span>`)}`
+                    },
+                    // "Your code/otp is: 123456" format
+                    {
+                        regex: /(?:your|the)?\s+(?:code|otp)(?:\s+is)?(?:\s*:|is)?[^\d]*(\d{4,8})/gi,
+                        template: (match, code) => `${match.replace(code, `<span class="verification-code">${code} <button class="btn btn-sm btn-outline-primary copy-btn" data-code="${code}">Copy</button></span>`)}`
+                    },
+                    // Standalone digit groups that look like verification codes in HTML tags
+                    {
+                        regex: /<(?:p|div|span|h[1-6]|td|strong|b)(?:[^>]*)>(\s*\d{4,8}\s*)<\/(?:p|div|span|h[1-6]|td|strong|b)>/gi,
+                        template: (match, code) => `${match.replace(code, `${code.trim()} <button class="btn btn-sm btn-outline-primary copy-btn" data-code="${code.trim()}">Copy</button>`)}`
+                    },
+                    // Digits that are exactly 6 characters and appear to be a code
+                    {
+                        regex: /\b(\d{6})\b/g,
+                        template: (match, code) => `<span class="verification-code">${code} <button class="btn btn-sm btn-outline-primary copy-btn" data-code="${code}">Copy</button></span>`
+                    }
+                ];
+                
+                // Apply each pattern to the content
+                let processedContent = content;
+                const foundCodes = new Set();
+                
+                patterns.forEach(pattern => {
+                    let match;
+                    const regex = new RegExp(pattern.regex);
+                    
+                    // First collect all codes
+                    const tempContent = content.toString(); // Make a copy to avoid regex lastIndex issues
+                    while ((match = regex.exec(tempContent)) !== null) {
+                        if (match[1]) {
+                            foundCodes.add(match[1].trim());
+                        }
+                    }
+                    
+                    // Then process the content
+                    processedContent = processedContent.replace(pattern.regex, pattern.template);
+                });
+                
+                // Also try to find specific Vietnamese terms for verification codes
+                const vnTerms = [
+                    'mã xác nhận',
+                    'mã xác thực',
+                    'mã bảo mật',
+                    'mã kích hoạt',
+                    'mã OTP'
+                ];
+                
+                // Create a regex pattern for Vietnamese terms
+                const vnPattern = new RegExp(`(${vnTerms.join('|')})(?:\\s+(?:của|là|của bạn|của quý khách))?(?:\\s+là)?(?:\\s*:|là)?[^\\d]*(\\d{4,8})`, 'gi');
+                
+                // Collect codes from Vietnamese patterns
+                let vnMatch;
+                const tempVnContent = content.toString(); // Make a copy to avoid regex lastIndex issues
+                while ((vnMatch = vnPattern.exec(tempVnContent)) !== null) {
+                    if (vnMatch[2]) {
+                        foundCodes.add(vnMatch[2].trim());
+                    }
+                }
+                
+                processedContent = processedContent.replace(vnPattern, (match, term, code) => {
+                    return match.replace(code, `<span class="verification-code">${code} <button class="btn btn-sm btn-outline-primary copy-btn" data-code="${code}">Copy</button></span>`);
+                });
+                
+                // Display the found codes in the dedicated section
+                if (foundCodes.size > 0) {
+                    foundCodesContainer.style.display = 'block';
+                    foundCodesList.innerHTML = '';
+                    
+                    foundCodes.forEach(code => {
+                        const codePill = document.createElement('div');
+                        codePill.className = 'code-pill';
+                        codePill.innerHTML = `
+                            <span class="me-2"><strong>${code}</strong></span>
+                            <button class="btn btn-sm btn-outline-primary copy-btn" data-code="${code}">Copy</button>
+                        `;
+                        foundCodesList.appendChild(codePill);
+                    });
+                } else {
+                    foundCodesContainer.style.display = 'none';
+                }
+                
+                return processedContent;
+            }
+            
+            // Add event listeners to copy buttons
+            function addCopyButtonListeners() {
+                const copyButtons = document.querySelectorAll('.copy-btn');
+                copyButtons.forEach(button => {
+                    button.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        
+                        const code = this.getAttribute('data-code');
+                        navigator.clipboard.writeText(code)
+                            .then(() => {
+                                // Change button text temporarily
+                                const originalText = this.textContent;
+                                this.textContent = 'Copied!';
+                                this.classList.add('btn-success');
+                                this.classList.remove('btn-outline-primary');
+                                
+                                setTimeout(() => {
+                                    this.textContent = originalText;
+                                    this.classList.remove('btn-success');
+                                    this.classList.add('btn-outline-primary');
+                                }, 2000);
+                            })
+                            .catch(err => {
+                                console.error('Failed to copy: ', err);
+                            });
+                    });
+                });
+            }
+            
+            function showLoading(show) {
+                loading.style.display = show ? 'block' : 'none';
+            }
+        });
+    </script>
+</body>
+</html>
